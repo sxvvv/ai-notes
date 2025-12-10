@@ -113,21 +113,7 @@ npm run dev
 
 ## 📸 功能演示
 
-### 主界面截图
-
 ![Dashboard](./docs/images/dashboard.png)
-*仪表板 - 查看学习统计和贡献图*
-
-![Editor](./docs/images/editor.png)
-*Markdown 编辑器 - 支持实时预览和 AI 助手*
-
-![AI Assistant](./docs/images/ai-assistant.png)
-*AI 聊天助手 - 随时与 AI 对话*
-
-> 📝 **注意**：截图需要添加到 `docs/images/` 目录。你可以：
-> 1. 访问在线演示并截图
-> 2. 将截图保存到 `docs/images/` 目录
-> 3. 使用上面的路径引用截图
 
 ### 主要功能
 
@@ -176,7 +162,6 @@ npm run dev
 
 - [📖 部署指南](./DEPLOY.md) - Vercel、Netlify 等部署说明
 - [🔐 权限配置](./AUTH_SETUP.md) - 服务端权限验证配置
-- [🚀 GitHub 上传指南](./GITHUB_SETUP.md) - 安全上传到 GitHub
 - [🔒 权限限制](./RESTRICT_EMAIL.md) - 单邮箱权限配置
 
 ## 🌟 项目亮点
