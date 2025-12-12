@@ -203,8 +203,140 @@ export async function getWritingSuggestion(text: string, context?: string, mode:
   })
 }
 
-// 通用 AI 对话
-export async function chatWithAI(prompt: string, context?: string): Promise<AIResponse> {
+// 通用 AI 对话（支持历史消息）
+export async function chatWithAI(prompt: string, context?: string, history?: Array<{ role: 'user' | 'assistant', content: string }>): Promise<AIResponse> {
+  // 如果有历史消息，构建完整的消息列表
+  if (history && history.length > 0) {
+    const messages = [
+      {
+        role: 'system' as const,
+        content: '你是一个AI助手，帮助用户解决问题。用中文回复，要专业、友好、实用。',
+      },
+      ...(context ? [{
+        role: 'user' as const,
+        content: `上下文：${context}`
+      }] : []),
+      ...history.map(msg => ({
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content
+      })),
+      {
+        role: 'user' as const,
+        content: prompt,
+      },
+    ]
+
+    try {
+      const response = await fetch(AI_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${AI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-5-chat-free',
+          messages,
+          temperature: 0.7,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`API 错误: ${response.status} - ${errorText}`)
+      }
+
+      const data = await response.json()
+      
+      // 使用相同的解析逻辑
+      const toString = (value: any): string => {
+        if (value === null || value === undefined) return ''
+        if (typeof value === 'string') return value
+        if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+        if (Array.isArray(value)) {
+          return value.map(toString).filter(Boolean).join('\n')
+        }
+        if (typeof value === 'object') {
+          for (const key of ['content', 'message', 'text', 'response', 'data', 'result', 'output']) {
+            if (value[key] !== undefined && value[key] !== null) {
+              const result = toString(value[key])
+              if (result) return result
+            }
+          }
+          return JSON.stringify(value, null, 2)
+        }
+        return String(value)
+      }
+      
+      let content = ''
+      if (data.choices && Array.isArray(data.choices) && data.choices.length > 0) {
+        const choice = data.choices[0]
+        if (choice.message) {
+          content = toString(choice.message.content || choice.message.text || choice.message)
+        } else if (choice.text) {
+          content = toString(choice.text)
+        } else if (choice.content) {
+          content = toString(choice.content)
+        } else {
+          content = toString(choice)
+        }
+      } else if (data.content !== undefined) {
+        content = toString(data.content)
+      } else if (data.message !== undefined) {
+        content = toString(data.message)
+      } else if (data.text !== undefined) {
+        content = toString(data.text)
+      } else if (data.response !== undefined) {
+        content = toString(data.response)
+      } else if (data.data !== undefined) {
+        content = toString(data.data)
+      } else if (data.result !== undefined) {
+        content = toString(data.result)
+      } else if (typeof data === 'string') {
+        content = data
+      } else {
+        const findStringContent = (obj: any, depth = 0): string => {
+          if (depth > 5) return ''
+          if (typeof obj === 'string' && obj.trim()) return obj
+          if (Array.isArray(obj)) {
+            for (const item of obj) {
+              const found = findStringContent(item, depth + 1)
+              if (found) return found
+            }
+          }
+          if (obj && typeof obj === 'object') {
+            for (const key of ['content', 'message', 'text', 'response', 'data', 'result', 'output', 'body']) {
+              if (obj[key] !== undefined) {
+                const found = findStringContent(obj[key], depth + 1)
+                if (found) return found
+              }
+            }
+            for (const value of Object.values(obj)) {
+              const found = findStringContent(value, depth + 1)
+              if (found) return found
+            }
+          }
+          return ''
+        }
+        content = findStringContent(data) || JSON.stringify(data, null, 2)
+      }
+      
+      content = toString(content).trim()
+      
+      if (!content || content === '{}' || content === '[]') {
+        throw new Error('API 返回的内容为空或无效')
+      }
+
+      return { content }
+    } catch (error: any) {
+      console.error('AI API 调用错误:', error)
+      return {
+        content: '',
+        error: error.message || 'AI 服务暂时不可用，请稍后重试',
+      }
+    }
+  }
+  
+  // 没有历史消息时使用原来的逻辑
   return callAI({
     prompt,
     context,
