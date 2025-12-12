@@ -193,7 +193,7 @@ export function NoteList({ notes, selectedNote, onSelectNote, onDeleteNote, getC
                   
                   {/* Actions */}
                   {canEdit && (
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
                       <div className="relative" ref={el => categorySelectRefs.current[note.id] = el}>
                         <button
                           onClick={(e) => { 

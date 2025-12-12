@@ -32,19 +32,37 @@ export function CategoryManager({ categories, onUpdate, canEdit = true }: Catego
   const rootCategories = categories.filter(c => !c.parent_id)
   const getChildren = (parentId: string) => categories.filter(c => c.parent_id === parentId)
 
-  const generateSlug = (name: string): string => {
-    return name
+  const generateSlug = (name: string, parentId: string | null = null): string => {
+    let baseSlug = name
       .toLowerCase()
       .replace(/[^\w\s-]/g, '')
       .replace(/\s+/g, '-')
       .replace(/-+/g, '-')
       .trim()
+    
+    // 如果是子分类，添加父分类的slug前缀以确保唯一性
+    if (parentId) {
+      const parent = categories.find(c => c.id === parentId)
+      if (parent) {
+        baseSlug = `${parent.slug}-${baseSlug}`
+      }
+    }
+    
+    // 检查slug是否已存在，如果存在则添加数字后缀
+    let slug = baseSlug
+    let counter = 1
+    while (categories.some(c => c.slug === slug && c.id !== editingId)) {
+      slug = `${baseSlug}-${counter}`
+      counter++
+    }
+    
+    return slug
   }
 
   const handleCreate = async () => {
     if (!canEdit || !formData.name.trim()) return
     
-    const slug = formData.slug || generateSlug(formData.name)
+    const slug = formData.slug || generateSlug(formData.name, formData.parent_id)
     
     try {
       // 如果是创建子分类，计算正确的 sort_order
@@ -67,9 +85,14 @@ export function CategoryManager({ categories, onUpdate, canEdit = true }: Catego
       setCreatingParentId(null)
       setFormData({ name: '', slug: '', icon: 'folder', parent_id: null, sort_order: 0 })
       onUpdate()
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create category:', error)
-      alert('创建分类失败，请检查名称是否重复')
+      const errorMessage = error?.message || '创建分类失败'
+      if (errorMessage.includes('duplicate') || errorMessage.includes('unique')) {
+        alert('分类名称或标识已存在，请使用其他名称')
+      } else {
+        alert(`创建分类失败：${errorMessage}`)
+      }
     }
   }
 
@@ -77,7 +100,8 @@ export function CategoryManager({ categories, onUpdate, canEdit = true }: Catego
     if (!canEdit || !formData.name.trim()) return
     
     try {
-      const slug = formData.slug || generateSlug(formData.name)
+      const category = categories.find(c => c.id === id)
+      const slug = formData.slug || generateSlug(formData.name, category?.parent_id || null)
       await updateCategory(id, {
         name: formData.name.trim(),
         slug,
@@ -87,9 +111,14 @@ export function CategoryManager({ categories, onUpdate, canEdit = true }: Catego
       setEditingId(null)
       setFormData({ name: '', slug: '', icon: 'folder', parent_id: null, sort_order: 0 })
       onUpdate()
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update category:', error)
-      alert('更新分类失败')
+      const errorMessage = error?.message || '更新分类失败'
+      if (errorMessage.includes('duplicate') || errorMessage.includes('unique')) {
+        alert('分类名称或标识已存在，请使用其他名称')
+      } else {
+        alert(`更新分类失败：${errorMessage}`)
+      }
     }
   }
 
@@ -163,7 +192,7 @@ export function CategoryManager({ categories, onUpdate, canEdit = true }: Catego
                 type="text"
                 value={formData.name}
                 onChange={(e) => {
-                  setFormData({ ...formData, name: e.target.value, slug: generateSlug(e.target.value) })
+                  setFormData({ ...formData, name: e.target.value, slug: generateSlug(e.target.value, formData.parent_id) })
                 }}
                 placeholder="例如：机器学习"
                 className="w-full px-3 py-2 bg-bg-surface border border-border-subtle rounded-lg text-text-primary focus:outline-none focus:border-accent-primary"
@@ -357,7 +386,7 @@ export function CategoryManager({ categories, onUpdate, canEdit = true }: Catego
                                   type="text"
                                   value={formData.name}
                                   onChange={(e) => {
-                                    setFormData({ ...formData, name: e.target.value, slug: generateSlug(e.target.value) })
+                                    setFormData({ ...formData, name: e.target.value, slug: generateSlug(e.target.value, child.parent_id) })
                                   }}
                                   className="w-full px-2 py-1.5 text-sm bg-bg-base border border-border-subtle rounded-lg text-text-primary focus:outline-none focus:border-accent-primary"
                                   autoFocus

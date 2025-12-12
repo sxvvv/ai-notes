@@ -70,11 +70,13 @@ export function AIChatAssistant() {
       const rect = containerRef.current.getBoundingClientRect()
       
       if (resizeType === 'width' || resizeType === 'both') {
+        // 从右侧边缘计算新宽度
         const newWidth = Math.max(320, Math.min(1200, e.clientX - rect.left))
         setWidth(newWidth)
       }
       
       if (resizeType === 'height' || resizeType === 'both') {
+        // 从底部边缘计算新高度
         const newHeight = Math.max(400, Math.min(window.innerHeight - 100, window.innerHeight - e.clientY + rect.top))
         setHeight(newHeight)
       }
@@ -203,12 +205,13 @@ export function AIChatAssistant() {
                 setIsResizing(true)
                 setResizeType('both')
               }}
-              className="absolute bottom-0 right-0 w-6 h-6 cursor-nwse-resize hover:bg-accent-primary/30 transition-colors rounded-tl-lg z-10"
+              className="absolute bottom-0 right-0 w-8 h-8 cursor-nwse-resize hover:bg-accent-primary/30 transition-colors rounded-tl-lg z-20"
+              style={{ touchAction: 'none' }}
               title="拖拽调整大小"
             >
-              <div className="absolute bottom-1 right-1 w-3 h-3 border-r-2 border-b-2 border-accent-primary/80" />
+              <div className="absolute bottom-2 right-2 w-4 h-4 border-r-2 border-b-2 border-accent-primary/80" />
             </div>
-            {/* 右侧调整宽度 */}
+            {/* 右侧调整宽度 - 增大拖拽区域 */}
             <div
               onMouseDown={(e) => {
                 e.preventDefault()
@@ -216,10 +219,11 @@ export function AIChatAssistant() {
                 setIsResizing(true)
                 setResizeType('width')
               }}
-              className="absolute top-0 right-0 w-3 h-full cursor-ew-resize hover:bg-accent-primary/20 transition-colors z-10"
+              className="absolute top-0 right-0 w-4 h-full cursor-ew-resize hover:bg-accent-primary/20 transition-colors z-20"
+              style={{ touchAction: 'none' }}
               title="拖拽调整宽度"
             />
-            {/* 底部调整高度 */}
+            {/* 底部调整高度 - 增大拖拽区域 */}
             <div
               onMouseDown={(e) => {
                 e.preventDefault()
@@ -227,7 +231,8 @@ export function AIChatAssistant() {
                 setIsResizing(true)
                 setResizeType('height')
               }}
-              className="absolute bottom-0 left-0 w-full h-3 cursor-ns-resize hover:bg-accent-primary/20 transition-colors z-10"
+              className="absolute bottom-0 left-0 w-full h-4 cursor-ns-resize hover:bg-accent-primary/20 transition-colors z-20"
+              style={{ touchAction: 'none' }}
               title="拖拽调整高度"
             />
           </>
