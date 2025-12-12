@@ -40,6 +40,8 @@ function App() {
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const sidebarRef = useRef<HTMLDivElement>(null)
+  const resizeStartX = useRef<number>(0)
+  const resizeStartWidth = useRef<number>(0)
 
   // Auto-close sidebar on mobile when navigating
   useEffect(() => {
@@ -66,6 +68,31 @@ function App() {
       subscription.unsubscribe()
     }
   }, [])
+
+  // 侧边栏宽度调整逻辑
+  useEffect(() => {
+    if (!isResizing) return
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!sidebarRef.current) return
+      const deltaX = e.clientX - resizeStartX.current
+      const newWidth = Math.max(200, Math.min(800, resizeStartWidth.current + deltaX))
+      setSidebarWidth(newWidth)
+      localStorage.setItem('sidebar-width', newWidth.toString())
+    }
+
+    const handleMouseUp = () => {
+      setIsResizing(false)
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [isResizing])
 
   async function checkAuth() {
     try {
@@ -174,15 +201,16 @@ $$
       return
     }
 
+    // Always update updated_at when saving
+    const updatesWithTimestamp = { ...updates, updated_at: new Date().toISOString() }
+    
     // Handle local state update first
-    const updatedNote = { ...notes.find(n => n.id === id)!, ...updates }
+    const updatedNote = { ...notes.find(n => n.id === id)!, ...updatesWithTimestamp }
     setNotes(notes.map(n => n.id === id ? updatedNote : n))
     setSelectedNote(updatedNote)
     
-    // Then persist to database (only for content changes)
-    if (updates.title || updates.content) {
-      await updateNote(id, updates)
-    }
+    // Then persist to database (always update when saving)
+    await updateNote(id, updatesWithTimestamp)
   }
 
   async function handleDeleteNote(id: string) {
@@ -250,8 +278,6 @@ $$
     ? notes.filter(n => n.category_id === selectedCategoryId)
     : notes
 
-  const completedCount = notes.filter(n => n.is_completed).length
-
   const getCategoryById = (id: string | null) => categories.find(c => c.id === id)
 
   if (isLoading) {
@@ -309,14 +335,13 @@ $$
                   if (isMobile) setIsSidebarOpen(false)
                 }}
                 noteCount={notes.length}
-                completedCount={completedCount}
                 isCollapsed={isSidebarCollapsed}
                 onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
               />
               {/* 分割线和拖拽调整宽度的手柄 */}
               {!isMobile && (
                 <div
-                  className="absolute top-0 right-0 w-3 h-full group"
+                  className="absolute top-0 right-0 w-4 h-full group"
                   style={{ zIndex: 10 }}
                 >
                   {/* 拖拽调整宽度区域 - 只在未折叠时可用 */}
@@ -325,9 +350,11 @@ $$
                       onMouseDown={(e) => {
                         e.preventDefault()
                         e.stopPropagation()
+                        resizeStartX.current = e.clientX
+                        resizeStartWidth.current = sidebarWidth
                         setIsResizing(true)
                       }}
-                      className="absolute top-0 right-0 w-3 h-full cursor-col-resize hover:bg-accent-primary/20 transition-colors"
+                      className="absolute top-0 right-0 w-4 h-full cursor-col-resize hover:bg-accent-primary/20 transition-colors"
                       title="拖拽调整宽度"
                     />
                   )}
@@ -336,9 +363,11 @@ $$
                   <div
                     onClick={(e) => {
                       e.stopPropagation()
-                      setIsSidebarCollapsed(!isSidebarCollapsed)
+                      if (!isResizing) {
+                        setIsSidebarCollapsed(!isSidebarCollapsed)
+                      }
                     }}
-                    className="absolute top-1/2 -translate-y-1/2 right-0 w-3 h-16 flex items-center justify-center cursor-pointer hover:w-4 transition-all"
+                    className="absolute top-1/2 -translate-y-1/2 right-0 w-4 h-16 flex items-center justify-center cursor-pointer hover:bg-accent-primary/10 transition-all rounded"
                     title={isSidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'}
                   >
                     <div className="w-0.5 h-full bg-border-subtle group-hover:bg-accent-primary transition-colors" />
@@ -383,6 +412,7 @@ $$
             onDeleteNote={handleDeleteNote}
             getCategoryById={getCategoryById}
             canEdit={canEdit}
+            onNoteUpdate={handleUpdateNote}
           />
         ) : (
           <Editor

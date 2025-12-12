@@ -10,11 +10,26 @@ interface Message {
 export function AIChatAssistant() {
   const [isOpen, setIsOpen] = useState(false)
   const [isMinimized, setIsMinimized] = useState(false)
-  const [messages, setMessages] = useState<Message[]>([])
+  const [messages, setMessages] = useState<Message[]>(() => {
+    // 从localStorage恢复对话历史
+    const saved = localStorage.getItem('ai-chat-messages')
+    return saved ? JSON.parse(saved) : []
+  })
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [width, setWidth] = useState(() => {
+    const saved = localStorage.getItem('ai-chat-width')
+    return saved ? parseInt(saved, 10) : 384 // 默认 384px (w-96)
+  })
+  const [height, setHeight] = useState(() => {
+    const saved = localStorage.getItem('ai-chat-height')
+    return saved ? parseInt(saved, 10) : 600 // 默认 600px
+  })
+  const [isResizing, setIsResizing] = useState(false)
+  const [resizeType, setResizeType] = useState<'width' | 'height' | 'both' | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -24,22 +39,73 @@ export function AIChatAssistant() {
     scrollToBottom()
   }, [messages])
 
+  // 保存对话历史到localStorage
+  useEffect(() => {
+    if (messages.length > 0) {
+      localStorage.setItem('ai-chat-messages', JSON.stringify(messages))
+    }
+  }, [messages])
+
   useEffect(() => {
     if (isOpen && !isMinimized) {
       inputRef.current?.focus()
     }
   }, [isOpen, isMinimized])
 
+  // 保存尺寸到localStorage
+  useEffect(() => {
+    if (width) localStorage.setItem('ai-chat-width', width.toString())
+  }, [width])
+
+  useEffect(() => {
+    if (height) localStorage.setItem('ai-chat-height', height.toString())
+  }, [height])
+
+  // 处理拖拽调整大小
+  useEffect(() => {
+    if (!isResizing) return
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!containerRef.current) return
+      const rect = containerRef.current.getBoundingClientRect()
+      
+      if (resizeType === 'width' || resizeType === 'both') {
+        const newWidth = Math.max(320, Math.min(1200, e.clientX - rect.left))
+        setWidth(newWidth)
+      }
+      
+      if (resizeType === 'height' || resizeType === 'both') {
+        const newHeight = Math.max(400, Math.min(window.innerHeight - 100, window.innerHeight - e.clientY + rect.top))
+        setHeight(newHeight)
+      }
+    }
+
+    const handleMouseUp = () => {
+      setIsResizing(false)
+      setResizeType(null)
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [isResizing, resizeType])
+
   const handleSend = async () => {
     if (!input.trim() || isLoading) return
 
     const userMessage = input.trim()
     setInput('')
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }])
+    const newMessages = [...messages, { role: 'user' as const, content: userMessage }]
+    setMessages(newMessages)
     setIsLoading(true)
 
     try {
-      const response = await chatWithAI(userMessage)
+      // 传递历史消息以支持多轮对话
+      const response = await chatWithAI(userMessage, undefined, messages)
       
       if (response.error) {
         setMessages(prev => [...prev, { 
@@ -83,8 +149,12 @@ export function AIChatAssistant() {
   }
 
   return (
-    <div className={`fixed bottom-6 right-6 z-50 transition-all duration-300 ${isMinimized ? 'w-80 h-16' : 'w-96 h-[600px]'}`}>
-      <div className="bg-gradient-to-br from-bg-surface to-bg-elevated rounded-xl border border-border-subtle shadow-2xl flex flex-col h-full overflow-hidden">
+    <div 
+      ref={containerRef}
+      className={`fixed bottom-6 right-6 z-50 transition-all duration-300 ${isMinimized ? 'w-80 h-16' : ''}`}
+      style={!isMinimized ? { width: `${width}px`, height: `${height}px` } : {}}
+    >
+      <div className="bg-gradient-to-br from-bg-surface to-bg-elevated rounded-xl border border-border-subtle shadow-2xl flex flex-col h-full overflow-hidden relative">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border-subtle bg-bg-elevated">
           <div className="flex items-center gap-2">
@@ -107,9 +177,12 @@ export function AIChatAssistant() {
             <button
               onClick={(e) => {
                 e.stopPropagation()
-                setIsOpen(false)
-                setIsMinimized(false)
-                setMessages([])
+                if (confirm('确定要关闭并清空对话历史吗？')) {
+                  setIsOpen(false)
+                  setIsMinimized(false)
+                  setMessages([])
+                  localStorage.removeItem('ai-chat-messages')
+                }
               }}
               className="p-1.5 hover:bg-bg-surface rounded-lg transition-colors text-text-secondary hover:text-text-primary"
               title="关闭"
@@ -118,6 +191,47 @@ export function AIChatAssistant() {
             </button>
           </div>
         </div>
+
+        {/* 调整大小的手柄 */}
+        {!isMinimized && (
+          <>
+            {/* 右下角调整大小 */}
+            <div
+              onMouseDown={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                setIsResizing(true)
+                setResizeType('both')
+              }}
+              className="absolute bottom-0 right-0 w-6 h-6 cursor-nwse-resize hover:bg-accent-primary/30 transition-colors rounded-tl-lg z-10"
+              title="拖拽调整大小"
+            >
+              <div className="absolute bottom-1 right-1 w-3 h-3 border-r-2 border-b-2 border-accent-primary/80" />
+            </div>
+            {/* 右侧调整宽度 */}
+            <div
+              onMouseDown={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                setIsResizing(true)
+                setResizeType('width')
+              }}
+              className="absolute top-0 right-0 w-3 h-full cursor-ew-resize hover:bg-accent-primary/20 transition-colors z-10"
+              title="拖拽调整宽度"
+            />
+            {/* 底部调整高度 */}
+            <div
+              onMouseDown={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                setIsResizing(true)
+                setResizeType('height')
+              }}
+              className="absolute bottom-0 left-0 w-full h-3 cursor-ns-resize hover:bg-accent-primary/20 transition-colors z-10"
+              title="拖拽调整高度"
+            />
+          </>
+        )}
 
         {!isMinimized && (
           <>
@@ -183,9 +297,24 @@ export function AIChatAssistant() {
                   )}
                 </button>
               </div>
-              <p className="text-xs text-text-muted mt-2 text-center">
-                💡 提示：可以问我任何问题，我会尽力帮助你
-              </p>
+              <div className="flex items-center justify-between mt-2">
+                <p className="text-xs text-text-muted">
+                  💡 提示：可以问我任何问题，我会尽力帮助你
+                </p>
+                {messages.length > 0 && (
+                  <button
+                    onClick={() => {
+                      if (confirm('确定要清空对话历史吗？')) {
+                        setMessages([])
+                        localStorage.removeItem('ai-chat-messages')
+                      }
+                    }}
+                    className="text-xs text-text-muted hover:text-text-primary transition-colors"
+                  >
+                    清空历史
+                  </button>
+                )}
+              </div>
             </div>
           </>
         )}

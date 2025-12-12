@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { X, Save, Eye, Edit3, Check, CheckCircle, Circle, Lock } from 'lucide-react'
-import { Note, Category, toggleNoteCompleted } from '../lib/supabase'
+import { X, Save, Eye, Edit3, Check, Lock, FolderOpen, ChevronDown } from 'lucide-react'
+import { Note, Category, getCategories } from '../lib/supabase'
 import { MarkdownPreview } from './MarkdownPreview'
 import { TagManager } from './TagManager'
 
@@ -15,41 +15,73 @@ interface EditorProps {
 export function Editor({ note, onUpdate, onClose, category, canEdit = true }: EditorProps) {
   const [title, setTitle] = useState(note.title)
   const [content, setContent] = useState(note.content)
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(note.category_id)
+  const [categories, setCategories] = useState<Category[]>([])
+  const [showCategorySelect, setShowCategorySelect] = useState(false)
   const [isPreviewMode, setIsPreviewMode] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
-  const [isCompleted, setIsCompleted] = useState(note.is_completed)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const categorySelectRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     setTitle(note.title)
     setContent(note.content)
-    setIsCompleted(note.is_completed)
+    setSelectedCategoryId(note.category_id)
     setHasChanges(false)
   }, [note.id])
 
   useEffect(() => {
-    const hasChange = title !== note.title || content !== note.content
+    loadCategories()
+  }, [])
+
+  async function loadCategories() {
+    try {
+      const cats = await getCategories()
+      setCategories(cats)
+    } catch (error) {
+      console.error('Failed to load categories:', error)
+    }
+  }
+
+  const getCategoryById = (id: string | null) => categories.find(c => c.id === id)
+  const rootCategories = categories.filter(c => !c.parent_id)
+  const getChildren = (parentId: string) => categories.filter(c => c.parent_id === parentId)
+
+  const handleCategoryChange = (categoryId: string | null) => {
+    setSelectedCategoryId(categoryId)
+    onUpdate({ category_id: categoryId })
+    setShowCategorySelect(false)
+  }
+
+  // 点击外部关闭分类选择
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (categorySelectRef.current && !categorySelectRef.current.contains(event.target as Node)) {
+        setShowCategorySelect(false)
+      }
+    }
+    if (showCategorySelect) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showCategorySelect])
+
+  useEffect(() => {
+    const hasChange = title !== note.title || content !== note.content || selectedCategoryId !== note.category_id
     setHasChanges(hasChange)
-  }, [title, content, note])
+  }, [title, content, selectedCategoryId, note])
 
   const handleSave = useCallback(async () => {
     if (!canEdit || !hasChanges) return
     setIsSaving(true)
     try {
-      await onUpdate({ title, content })
+      await onUpdate({ title, content, category_id: selectedCategoryId })
       setHasChanges(false)
     } finally {
       setIsSaving(false)
     }
-  }, [title, content, hasChanges, onUpdate, canEdit])
-
-  const handleToggleComplete = async () => {
-    const newStatus = !isCompleted
-    setIsCompleted(newStatus)
-    await toggleNoteCompleted(note.id, newStatus)
-    onUpdate({ is_completed: newStatus })
-  }
+  }, [title, content, selectedCategoryId, hasChanges, onUpdate, canEdit])
 
 
   // Keyboard shortcuts
@@ -76,20 +108,74 @@ export function Editor({ note, onUpdate, onClose, category, canEdit = true }: Ed
           <button onClick={onClose} className="p-2 hover:bg-bg-elevated rounded-md transition-colors">
             <X className="w-5 h-5 text-text-secondary" />
           </button>
-          {category && (
-            <span className="text-xs px-2 py-1 bg-bg-elevated rounded text-text-muted">
-              {category.name}
-            </span>
+          {canEdit ? (
+            <div className="relative" ref={categorySelectRef}>
+              <button
+                onClick={() => setShowCategorySelect(!showCategorySelect)}
+                className="flex items-center gap-2 text-xs px-3 py-1.5 bg-bg-elevated hover:bg-bg-surface rounded-lg text-text-secondary hover:text-text-primary transition-colors border border-border-subtle"
+              >
+                <FolderOpen className="w-3.5 h-3.5" />
+                <span>{getCategoryById(selectedCategoryId)?.name || '未分类'}</span>
+                <ChevronDown className={`w-3 h-3 transition-transform ${showCategorySelect ? 'rotate-180' : ''}`} />
+              </button>
+              {showCategorySelect && (
+                <div className="absolute top-full left-0 mt-1 w-64 bg-bg-elevated border border-border-subtle rounded-lg shadow-xl z-50 max-h-96 overflow-y-auto">
+                  <div className="p-2">
+                    <button
+                      onClick={() => handleCategoryChange(null)}
+                      className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${
+                        selectedCategoryId === null
+                          ? 'bg-accent-primary/10 text-accent-primary'
+                          : 'hover:bg-bg-surface text-text-secondary'
+                      }`}
+                    >
+                      未分类
+                    </button>
+                    {rootCategories.map(rootCat => {
+                      const children = getChildren(rootCat.id)
+                      return (
+                        <div key={rootCat.id} className="mt-1">
+                          <button
+                            onClick={() => handleCategoryChange(rootCat.id)}
+                            className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${
+                              selectedCategoryId === rootCat.id
+                                ? 'bg-accent-primary/10 text-accent-primary'
+                                : 'hover:bg-bg-surface text-text-secondary'
+                            }`}
+                          >
+                            {rootCat.name}
+                          </button>
+                          {children.length > 0 && (
+                            <div className="ml-4 mt-1 space-y-0.5">
+                              {children.map(child => (
+                                <button
+                                  key={child.id}
+                                  onClick={() => handleCategoryChange(child.id)}
+                                  className={`w-full text-left px-3 py-1.5 text-xs rounded-lg transition-colors ${
+                                    selectedCategoryId === child.id
+                                      ? 'bg-accent-primary/10 text-accent-primary'
+                                      : 'hover:bg-bg-surface text-text-muted'
+                                  }`}
+                                >
+                                  └ {child.name}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            category && (
+              <span className="text-xs px-2 py-1 bg-bg-elevated rounded text-text-muted">
+                {category.name}
+              </span>
+            )
           )}
-          <button
-            onClick={handleToggleComplete}
-            className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-colors ${
-              isCompleted ? 'bg-success/20 text-success' : 'bg-bg-elevated text-text-muted hover:text-text-primary'
-            }`}
-          >
-            {isCompleted ? <CheckCircle className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
-            {isCompleted ? '已完成' : '标记完成'}
-          </button>
         </div>
         
         <div className="flex items-center gap-2">

@@ -1,4 +1,4 @@
-import { BookOpen, CheckCircle, Clock, TrendingUp, FileText, Sparkles, Target, BarChart3 } from 'lucide-react'
+import { BookOpen, Clock, TrendingUp, FileText, Sparkles, Target, BarChart3 } from 'lucide-react'
 import { Note, Category } from '../lib/supabase'
 import { ContributionGraph } from './ContributionGraph'
 
@@ -35,8 +35,7 @@ export function Dashboard({ notes, categories, onSelectNote, onNewNote, getCateg
   // 按分类统计
   const categoryStats = categories.map(cat => {
     const count = notes.filter(n => n.category_id === cat.id).length
-    const completed = notes.filter(n => n.category_id === cat.id && n.is_completed).length
-    return { ...cat, count, completed, progress: count > 0 ? Math.round((completed / count) * 100) : 0 }
+    return { ...cat, count }
   }).filter(stat => stat.count > 0).sort((a, b) => b.count - a.count)
 
   const formatDate = (dateStr: string) => {
@@ -157,9 +156,6 @@ export function Dashboard({ notes, categories, onSelectNote, onNewNote, getCateg
                         <h4 className="text-sm font-medium text-text-primary group-hover:text-accent-primary transition-colors line-clamp-1">
                           {note.title}
                         </h4>
-                        {note.is_completed && (
-                          <CheckCircle className="w-4 h-4 text-success shrink-0 mt-0.5" />
-                        )}
                       </div>
                       {category && (
                         <div className="text-xs text-text-muted mb-1">{category.name}</div>

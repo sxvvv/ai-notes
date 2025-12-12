@@ -8,7 +8,6 @@ interface SidebarProps {
   activeView: 'dashboard' | 'list' | 'categories' | 'category'
   onSelectCategory: (id: string | null | 'dashboard' | 'categories') => void
   noteCount: number
-  completedCount: number
   isCollapsed?: boolean
   onToggleCollapse?: () => void
 }
@@ -39,7 +38,7 @@ const learningPath = [
   { stage: '工程实践', desc: '容器化、MLOps', progress: 0 },
 ]
 
-export function Sidebar({ categories, selectedCategoryId, activeView, onSelectCategory, noteCount, completedCount, isCollapsed = false, onToggleCollapse }: SidebarProps) {
+export function Sidebar({ categories, selectedCategoryId, activeView, onSelectCategory, noteCount, isCollapsed = false, onToggleCollapse }: SidebarProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
 
   // 默认展开所有根分类
@@ -60,8 +59,6 @@ export function Sidebar({ categories, selectedCategoryId, activeView, onSelectCa
 
   const rootCategories = categories.filter(c => !c.parent_id).sort((a, b) => a.sort_order - b.sort_order)
   const getChildren = (parentId: string) => categories.filter(c => c.parent_id === parentId).sort((a, b) => a.sort_order - b.sort_order)
-  
-  const progressPercent = noteCount > 0 ? Math.round((completedCount / noteCount) * 100) : 0
 
   return (
     <aside className={`h-full bg-gradient-to-b from-black to-bg-base flex flex-col shrink-0 overflow-y-auto transition-all duration-300 ${isCollapsed ? 'w-[60px]' : 'w-full'}`}>
