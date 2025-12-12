@@ -131,7 +131,7 @@ export function Editor({ note, onUpdate, onClose, category, canEdit = true }: Ed
                     >
                       未分类
                     </button>
-                    {rootCategories.map(rootCat => {
+                    {rootCategories.length > 0 && rootCategories.map(rootCat => {
                       const children = getChildren(rootCat.id)
                       return (
                         <div key={rootCat.id} className="mt-1">
@@ -165,6 +165,11 @@ export function Editor({ note, onUpdate, onClose, category, canEdit = true }: Ed
                         </div>
                       )
                     })}
+                    {rootCategories.length === 0 && (
+                      <div className="px-3 py-2 text-sm text-text-muted text-center">
+                        暂无分类
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

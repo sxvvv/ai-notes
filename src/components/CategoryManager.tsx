@@ -346,7 +346,7 @@ export function CategoryManager({ categories, onUpdate, canEdit = true }: Catego
                             type="text"
                             value={formData.name}
                             onChange={(e) => {
-                              setFormData({ ...formData, name: e.target.value, slug: generateSlug(e.target.value) })
+                              setFormData({ ...formData, name: e.target.value, slug: generateSlug(e.target.value, category.id) })
                             }}
                             placeholder="例如：计算机基础"
                             className="w-full px-2 py-1.5 text-sm bg-bg-base border border-border-subtle rounded-lg text-text-primary focus:outline-none focus:border-accent-primary"

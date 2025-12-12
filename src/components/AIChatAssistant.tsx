@@ -30,6 +30,7 @@ export function AIChatAssistant() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const resizeStartPos = useRef({ x: 0, y: 0, width: 0, height: 0 })
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -67,17 +68,18 @@ export function AIChatAssistant() {
 
     const handleMouseMove = (e: MouseEvent) => {
       if (!containerRef.current) return
-      const rect = containerRef.current.getBoundingClientRect()
       
       if (resizeType === 'width' || resizeType === 'both') {
-        // 从右侧边缘计算新宽度
-        const newWidth = Math.max(320, Math.min(1200, e.clientX - rect.left))
+        // 计算宽度变化：鼠标当前位置 - 初始位置
+        const deltaX = e.clientX - resizeStartPos.current.x
+        const newWidth = Math.max(320, Math.min(1200, resizeStartPos.current.width + deltaX))
         setWidth(newWidth)
       }
       
       if (resizeType === 'height' || resizeType === 'both') {
-        // 从底部边缘计算新高度
-        const newHeight = Math.max(400, Math.min(window.innerHeight - 100, window.innerHeight - e.clientY + rect.top))
+        // 计算高度变化：初始位置 - 鼠标当前位置（因为从底部向上拖）
+        const deltaY = resizeStartPos.current.y - e.clientY
+        const newHeight = Math.max(400, Math.min(window.innerHeight - 100, resizeStartPos.current.height + deltaY))
         setHeight(newHeight)
       }
     }
@@ -202,6 +204,15 @@ export function AIChatAssistant() {
               onMouseDown={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
+                if (containerRef.current) {
+                  const rect = containerRef.current.getBoundingClientRect()
+                  resizeStartPos.current = {
+                    x: e.clientX,
+                    y: e.clientY,
+                    width: rect.width,
+                    height: rect.height
+                  }
+                }
                 setIsResizing(true)
                 setResizeType('both')
               }}
@@ -216,6 +227,15 @@ export function AIChatAssistant() {
               onMouseDown={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
+                if (containerRef.current) {
+                  const rect = containerRef.current.getBoundingClientRect()
+                  resizeStartPos.current = {
+                    x: e.clientX,
+                    y: e.clientY,
+                    width: rect.width,
+                    height: rect.height
+                  }
+                }
                 setIsResizing(true)
                 setResizeType('width')
               }}
@@ -228,6 +248,15 @@ export function AIChatAssistant() {
               onMouseDown={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
+                if (containerRef.current) {
+                  const rect = containerRef.current.getBoundingClientRect()
+                  resizeStartPos.current = {
+                    x: e.clientX,
+                    y: e.clientY,
+                    width: rect.width,
+                    height: rect.height
+                  }
+                }
                 setIsResizing(true)
                 setResizeType('height')
               }}
